@@ -9,17 +9,17 @@ and **remediates** safely.
  Grafana (alerts, PromQL) ─┘        (JSON)         (dry-run by default)
 ```
 
-## Setup (Cloud Shell)
+## Run locally
 ```bash
-cd ~/gcpkubernetes/ai-sre-agent            # drop this folder into your repo
+cd ai-sre-agent
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env && nano .env && set -a && source .env && set +a
-gcloud container clusters get-credentials ai-k8s-cluster --region asia-south1
+gcloud container clusters get-credentials ai-k8s-cluster --region asia-south1 --project abdulproject-510307
 ```
 Tokens needed:
 - **GEMINI_API_KEY**: optional; without it the agent uses the rule engine.
-- **GITHUB_TOKEN**: fine-grained PAT, repo `techabdulrahman/gcpkubernetes`, permission *Actions: Read*.
+- **GITHUB_TOKEN**: fine-grained PAT, repo `techabdulrahman/GKE`, permission *Actions: Read*.
 - **GRAFANA_TOKEN**: Grafana → Administration → Service accounts → Viewer role → add token.
   Optional `GRAFANA_PROM_UID` enables the PromQL checks (restarts, pods not ready; needs kube-state-metrics).
 
@@ -31,6 +31,29 @@ python -m agent.main --no-llm        # rules only
 python -m agent.main --watch 60      # continuous loop
 ```
 Each run writes `report.json`.
+
+## Deploy to GKE with GitHub Actions
+
+The workflow in `.github/workflows/google.yml` builds and pushes an image tagged with the commit SHA,
+then applies the agent's CronJob, RBAC, ConfigMap, and ServiceAccount manifests. It does not modify
+the demo Deployment or Service. The CronJob runs every five minutes with remediation in dry-run mode;
+incident reports are also emitted as JSON to stdout for collection by GKE Cloud Logging.
+
+Configure GitHub Actions repository variables:
+
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`: full Workload Identity Provider resource name.
+- `GCP_SERVICE_ACCOUNT`: email of the dedicated deploy service account.
+
+Configure Workload Identity Federation for this repository and grant the deploy identity only the
+permissions required to push to the Artifact Registry repository and deploy to the existing GKE
+cluster. The cluster's node identity must be able to pull from that repository. The agent's
+namespace-scoped Kubernetes Role only covers evidence collection and the `ai-k8s-demo` Deployment.
+
+Before enabling the workflow, ensure the GKE cluster has the `ai-troubleshooter` namespace and
+`ai-k8s-demo` Deployment. Optional runtime credentials belong in a Kubernetes Secret named
+`ai-sre-agent-secrets` in that namespace; create only the keys you use (`GITHUB_TOKEN`,
+`GEMINI_API_KEY`, `GRAFANA_URL`, `GRAFANA_TOKEN`, `GRAFANA_PROM_UID`). Do not commit secret values.
+Without Gemini credentials the agent uses rules; without Grafana configuration it skips Grafana.
 
 ## 2-minute demo
 ```bash

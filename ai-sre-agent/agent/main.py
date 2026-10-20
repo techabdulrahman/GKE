@@ -46,6 +46,7 @@ def once(a) -> dict:
               "diagnosis": d.to_dict(), "remediation": results}
     with open(a.report, "w") as fh:
         json.dump(report, fh, indent=2)
+    print(json.dumps({"incident_report": report}, separators=(",", ":")))
     return report
 
 
@@ -53,7 +54,7 @@ def main():
     p = argparse.ArgumentParser(description="AI SRE agent for GKE + GitHub Actions + Grafana")
     p.add_argument("--namespace", default=os.getenv("K8S_NAMESPACE", "ai-troubleshooter"))
     p.add_argument("--deployment", default=os.getenv("K8S_DEPLOYMENT", "ai-k8s-demo"))
-    p.add_argument("--repo", default=os.getenv("GITHUB_REPO", "techabdulrahman/gcpkubernetes"))
+    p.add_argument("--repo", default=os.getenv("GITHUB_REPO", "techabdulrahman/GKE"))
     p.add_argument("--workflow", default=os.getenv("GITHUB_WORKFLOW", "deploy.yml"))
     p.add_argument("--apply", action="store_true", help="actually execute remediation (default: dry-run)")
     p.add_argument("--no-llm", action="store_true", help="rule-based diagnosis only")

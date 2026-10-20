@@ -8,8 +8,9 @@ API = "https://api.github.com"
 
 def _h():
     h = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
-    if os.getenv("GITHUB_TOKEN"):
-        h["Authorization"] = f"Bearer {os.environ['GITHUB_TOKEN']}"
+    token = os.getenv("GITHUB_TOKEN")
+    if token:
+        h["Authorization"] = "Bearer " + token
     return h
 
 

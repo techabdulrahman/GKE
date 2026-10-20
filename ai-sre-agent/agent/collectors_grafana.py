@@ -6,8 +6,9 @@ from .models import Finding
 
 def _h():
     h = {"Accept": "application/json"}
-    if os.getenv("GRAFANA_TOKEN"):
-        h["Authorization"] = f"Bearer {os.environ['GRAFANA_TOKEN']}"
+    token = os.getenv("GRAFANA_TOKEN")
+    if token:
+        h["Authorization"] = "Bearer " + token
     return h
 
 

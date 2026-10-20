@@ -1,0 +1,141 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ai-sre-agent
+  namespace: ai-troubleshooter
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ai-sre-agent
+  namespace: ai-troubleshooter
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["ai-k8s-demo"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ai-sre-agent
+  namespace: ai-troubleshooter
+subjects:
+  - kind: ServiceAccount
+    name: ai-sre-agent
+    namespace: ai-troubleshooter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ai-sre-agent
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-sre-agent
+  namespace: ai-troubleshooter
+data:
+  K8S_NAMESPACE: ai-troubleshooter
+  K8S_DEPLOYMENT: ai-k8s-demo
+  GITHUB_REPO: techabdulrahman/GKE
+  GITHUB_WORKFLOW: google.yml
+  GEMINI_MODEL: gemini-2.5-flash
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ai-sre-agent
+  namespace: ai-troubleshooter
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 180
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 300
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          serviceAccountName: ai-sre-agent
+          automountServiceAccountToken: true
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: ai-sre-agent
+              image: __AGENT_IMAGE__
+              imagePullPolicy: IfNotPresent
+              args: ["--report", "/tmp/report.json"]
+              envFrom:
+                - configMapRef:
+                    name: ai-sre-agent
+              env:
+                - name: GITHUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-sre-agent-secrets
+                      key: GITHUB_TOKEN
+                      optional: true
+                - name: GEMINI_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-sre-agent-secrets
+                      key: GEMINI_API_KEY
+                      optional: true
+                - name: GRAFANA_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-sre-agent-secrets
+                      key: GRAFANA_URL
+                      optional: true
+                - name: GRAFANA_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-sre-agent-secrets
+                      key: GRAFANA_TOKEN
+                      optional: true
+                - name: GRAFANA_PROM_UID
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-sre-agent-secrets
+                      key: GRAFANA_PROM_UID
+                      optional: true
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir:
+                sizeLimit: 16Mi
