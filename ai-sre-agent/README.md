@@ -25,7 +25,7 @@ Tokens needed:
 
 ## Run
 ```bash
-python -m agent.main                 # dry-run, prints what it would do
+python -m agent.main                 # dry-run, prints what it would do.
 python -m agent.main --apply         # execute remediation
 python -m agent.main --no-llm        # rules only
 python -m agent.main --watch 60      # continuous loop
